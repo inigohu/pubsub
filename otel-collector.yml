@@ -1,0 +1,25 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+processors:
+exporters:
+  logging:
+    loglevel: error
+  zipkin:
+    endpoint: "http://zipkin:9411/api/v2/spans"
+    format: proto
+    default_service_name: "observability service"
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [zipkin]
+    metrics:
+      receivers: [otlp]
+      exporters: [prometheus]

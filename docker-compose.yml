@@ -1,0 +1,72 @@
+version: "3.7"
+
+services:
+  sender01:
+    container_name: sender01
+    build:
+      context: .
+    image: "inigohu/pubsub"
+    command: go run cmd/sender/main.go --frequency 100ms --instrumentation-host otel-collector:4317
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json
+      - OTEL_RESOURCE_ATTRIBUTES=container.name=sender01
+    volumes:
+      - ${ADC}:/tmp/keys/key.json:ro
+    depends_on:
+      - otel-collector
+      - receiver01
+      - receiver02
+
+  receiver01:
+    container_name: receiver01
+    build:
+      context: .
+    image: "inigohu/pubsub"
+    command: go run cmd/receiver/main.go --processors 10 --sleep 10ms --instrumentation-host otel-collector:4317
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json
+      - OTEL_RESOURCE_ATTRIBUTES=container.name=receiver01
+      - GOMAXPROCS=1
+    volumes:
+      - ${ADC}:/tmp/keys/key.json:ro
+
+  receiver02:
+    container_name: receiver02
+    build:
+      context: .
+    image: "inigohu/pubsub"
+    command: go run cmd/receiver/main.go --processors 10 --sleep 10ms --instrumentation-host otel-collector:4317
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json
+      - OTEL_RESOURCE_ATTRIBUTES=container.name=receiver02
+      - GOMAXPROCS=1
+    volumes:
+      - ${ADC}:/tmp/keys/key.json:ro
+
+  otel-collector:
+    container_name: otel-collector 
+    image: otel/opentelemetry-collector-contrib:0.53.0
+    command:
+      - "--config=/etc/otel-collector.yml"
+    volumes:
+      - ./otel-collector.yml:/etc/otel-collector.yml
+    ports:
+      - "4317:4317"   # OpenTelemetry receiver
+      - "8889:8889"   # Prometheus exporter metrics
+    depends_on:
+      - prometheus
+      - zipkin
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  zipkin:
+    container_name: zipkin 
+    image: openzipkin/zipkin:latest
+    ports:
+      - "9411:9411"
